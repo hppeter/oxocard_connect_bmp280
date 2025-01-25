@@ -1,5 +1,6 @@
 # Read a BMP 280 Sensor on I2C Adress 0x76
 # and display values in different ways
+# by HP Dietrich
 #
 # Adapted for the Python Library of David Stenwal (davit at stenwall.io)
 #
@@ -30,6 +31,7 @@ black = color()
 black.rgb(0, 0, 0)
 xOffset:int = 120  # correct the coordinates of the gauge
 yOffset:int = 120
+resetBMP:bool = false
 
 
 def scanI2CBus():   #Scan I2C Bus
@@ -47,10 +49,16 @@ def readSensor():
         print "No Sensor"
     #else
     #    print ("Chip ID = 0x" + byteToHex(chipID)) # ID 0x55 for BMP180, 0x58 for BMP280
-    #writeI2CByte(AddrBMP, 0xF4, 0xFF)  # write to Register 0xF4
     
-    buf:long[6]
-    # init values for test calibration. Needed to set variable values and types
+    if resetBMP == false
+        writeI2CByte(AddrBMP, 0xE0, 0xB6)   # reset BMP
+        writeI2CByte(AddrBMP, 0xF4, 0xFF)   # set BMP write mode
+        resetBMP = true
+
+   buf:long[6]
+
+    # init values for test calibration. 
+    # Needed to set variable values and types (do not delete next lines)
     T1 = 27504; T2 = 26435; T3 = -1000
     P1 = 36477; P2 = -10685; P3 = 3024
     P4 = 2855;  P5 = 140; P6 = -7
@@ -59,7 +67,6 @@ def readSensor():
     t_fine = 0; t = 0; p = 0
 
     # read calibration data
-    # do not delete this lines
     T1 = readI2CInt(AddrBMP, 0x88)
     T2 = readI2CInt(AddrBMP, 0x8A)
     T3 = readI2CInt(AddrBMP, 0x8C)
