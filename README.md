@@ -1,4 +1,4 @@
-Oxocard Connect with BMP280 Sensor
+# Oxocard Connect with BMP280 Sensor
 Oxocard NanoPy adaption of BMP280 temp/pressure sensor with display output
 
 Connect a BMP280 sensor via I2C to the Oxocard. I used a Oxocard Connect with Breadboard.
