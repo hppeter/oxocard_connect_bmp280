@@ -1,0 +1,237 @@
+# Read a BMP 280 Sensor on I2C Adress 0x76
+# and display values in different ways
+#
+# Adapted for the Python Library of David Stenwal (davit at stenwall.io)
+#
+
+AddrBMP:byte = 0x76    #118(0x76) for a BMP 280
+bmpTemp:float = 0
+bmpPres:float = 0
+
+tempValue:float = 0
+presValue:float = 0
+yellow = color()          # define color (r,g,b)
+yellow.rgb(255, 255 , 0)
+cyan = color()
+cyan.rgb(0, 255, 255)
+blue = color()
+blue.rgb(0, 0, 255)
+red = color()
+red.rgb(255, 0, 0)
+green = color()
+green.rgb(0, 255, 0)
+white = color()
+white.rgb(255, 255, 255)
+darkgray = color()
+darkgray.rgb(30, 30, 30)
+gray = color()
+gray.rgb(140, 140, 140)
+black = color()
+black.rgb(0, 0, 0)
+xOffset:int = 120  # correct the coordinates of the gauge
+yOffset:int = 120
+
+
+def scanI2CBus():   #Scan I2C Bus
+    i:byte = 0
+    while i < 127
+        if checkI2CAddress(i)
+            print "Adresse" 
+            print i 
+            print byteToHex(i)
+        i++
+
+def readSensor():
+    chipID = readI2CByte(AddrBMP, 0xD0)
+    if chipID != 0x58
+        print "No Sensor"
+    #else
+    #    print ("Chip ID = 0x" + byteToHex(chipID)) # ID 0x55 for BMP180, 0x58 for BMP280
+    #writeI2CByte(AddrBMP, 0xF4, 0xFF)  # write to Register 0xF4
+    
+    buf:long[6]
+    # init values for test calibration. Needed to set variable values and types
+    T1 = 27504; T2 = 26435; T3 = -1000
+    P1 = 36477; P2 = -10685; P3 = 3024
+    P4 = 2855;  P5 = 140; P6 = -7
+    P7 = 15500; P8 = -14600; P9 = 6000
+
+    t_fine = 0; t = 0; p = 0
+
+    # read calibration data
+    # do not delete this lines
+    T1 = readI2CInt(AddrBMP, 0x88)
+    T2 = readI2CInt(AddrBMP, 0x8A)
+    T3 = readI2CInt(AddrBMP, 0x8C)
+    P1 = readI2CInt(AddrBMP, 0x8E)  
+    P2 = readI2CInt(AddrBMP, 0x90)
+    P3 = readI2CInt(AddrBMP, 0x92)
+    P4 = readI2CInt(AddrBMP, 0x94)
+    P5 = readI2CInt(AddrBMP, 0x96)
+    P6 = readI2CInt(AddrBMP, 0x98)
+    P7 = readI2CInt(AddrBMP, 0x9a)
+    P8 = readI2CInt(AddrBMP, 0x9C)
+    P9 = readI2CInt(AddrBMP, 0x9E)
+
+    # read Pressure and Temperature  
+    readI2C(AddrBMP, 0xF7, 6)         # Read 6 Bytes from Sensor
+    for i in 6: buf[i] = getI2CByte() # Fill buffer with readed bytes
+
+    p_raw = (buf[0] << 12) + (buf[1] << 4) + (buf[2] >> 4)
+    t_raw = (buf[3] << 12) + (buf[4] << 4) + (buf[5] >> 4)
+
+    # Formula to calulate temperature * 100
+    if t_fine == 0:
+        var1 = (((t_raw >> 3) - (T1 << 1)) * T2) >> 11
+        var2 = (((((t_raw >> 4) - T1) * ((t_raw >> 4) - T1)) >> 12) * T3) >> 14
+        t_fine = var1 + var2
+    t = ((t_fine * 5 + 128) >> 8)
+    bmpTemp = t / 100  # get degrees in celsius and a floating point value
+    
+    # Formula to calculate pressure
+    if p == 0:
+        var1 = t_fine - 128000
+        var2 = var1 * var1 * P6
+        var2 = var2 + ((var1 * P5) << 17)
+        var2 = var2 + (P4 << 35)
+        var1 = ((var1 * var1 * P3) >> 8) + ((var1 * P2) << 12)
+        var1 = (((1 << 47) + var1) * P1) >> 33
+        p = 1048576 - p_raw
+        p = ((((p << 31) - var2) * 3125) / var1)
+        var1 = (P9 * (p >> 13) * (p >> 13)) >> 25
+        var2 = (P8 * p) >> 19
+    p = ((p + var1 + var2) >> 8) + (P7 << 4)
+    bmpPres = p / 256.0
+
+    delay (50)
+
+def drawScaleLine(angle, linestart, lineend, color);
+    x:float; y:float; x1:float; y1:float
+    winkelFloat:float
+    winkelRad:float 
+    lasti:int
+    skalaStart:int = 0
+        
+    winkelFloat = angle
+    winkelRad = (winkelFloat / 57.3)
+    
+    x = cos(winkelRad) * linestart  # calc inner x and y koordinates
+    y = sin(winkelRad) * linestart
+    x = -x; y = -y # invert x and y
+  
+    x1 = cos(winkelRad) * lineend  # calc outer x and y koordinates
+    y1 = sin(winkelRad) * lineend
+    x1 = -x1; y1 = -y1  # invert values
+
+    if color == 1: cyan.stroke() # lines color
+    if color == 2: yellow.stroke() # lines color
+    
+    drawLine(xOffset + x, yOffset + y, xOffset + x1, yOffset + y1)
+
+    # write Temperatur scale values
+    white.stroke()  # text color
+    textFont(FONT_ROBOTO_16)
+    if angle == 0; drawText(xOffset + x1 - 6, yOffset + y1 - 16, "0")
+    else if angle == 36; drawText(xOffset + x1 - 10, yOffset + y1 - 13, "10")
+    else if angle == 72; drawText(xOffset + x1 - 10, yOffset + y1 - 16, "20")
+    else if angle == 108; drawText(xOffset + x1 - 10, yOffset + y1 - 16, "30")
+    else if angle == 144; drawText(xOffset + x1 - 10, yOffset + y1 - 16, "40")
+    else if angle == 180; drawText(xOffset + x1 - 12, yOffset + y1 - 13, "50")
+    
+
+    # write Pressure scale values
+    white.stroke()  # text color
+    if angle == 180; drawText(xOffset + x1 - 20, yOffset + y1, "950")
+    else if angle == 234; drawText(xOffset + x1 - 10, yOffset + y1, "980")
+    else if angle == 306; drawText(xOffset + x1 - 20, yOffset + y1, "1020")
+    else if angle == 0: drawText(xOffset + x1 - 10, yOffset + y1, "1050")
+    
+
+def drawFingerLine(i, fingerlenght, color):
+    iFloat:float = i
+    winkelRad = (iFloat / 57.3)
+    
+    x = cos(winkelRad) * fingerlenght  # calc x and y koordinate from end of finger
+    y = sin(winkelRad) * fingerlenght
+    x = -x; y = -y   # invert x and y
+     
+    if color == 1: yellow.stroke()
+    if color == 2: cyan.stroke()
+    strokeWeight(2) # thickness of line
+    #drawLine(xOffset, yOffset, xOffset + x, yOffset + y)
+    drawTriangle(xOffset-2, yOffset-2,xOffset+2, yOffset+2,xOffset + x, yOffset + y)
+
+
+
+def drawScale():
+    darkgray.fill();  noStroke()
+    drawCircle(120,120,115)  # Clear fingers and numbers
+    i = 0  # set start angle
+    while i < 180 # long lines
+        drawScaleLine (i, 95, 115, 2)  # i, linestart, lineend
+        i +=18   # 5 degrees per line
+    i = 180
+    while i < 360
+        drawScaleLine (i, 95, 115, 1)  # i, linestart, lineend
+        i +=18
+    i = 0
+    while i < 180 # short lines
+        drawScaleLine (i, 105, 115, 2)  # i, linestart, lineend
+        i +=3.6
+    i = 180
+    while i < 360
+        drawScaleLine (i, 105, 115, 1)  # i, linestart, lineend
+        i +=9
+
+
+
+drawScale()
+
+def onDraw()
+    height = 240                    # height of messurement above sealevel
+    heightCalibration = height / 8  # 8m = 1hPa
+    multiread = 5
+  	for i in multiread              # Read Sensor 5 times for Average
+        readSensor()
+        tempValue += bmpTemp
+        presValue += bmpPres
+    
+    tempValue = tempValue / multiread # divide average value
+    tempValue -= 2.7 # correction of Temperatur value
+    presValue = (presValue / 5) + heightCalibration
+
+    setPrecision(1)     # Ausgabe auf 1 Nachkommastellen setzen
+    textFont(FONT_ROBOTO_32)
+    black.fill()  
+    noStroke()
+    drawCircle(120,120,95)  # Clear fingers and numbers
+    
+    # Temperatur output
+    white.stroke() # lines color
+    drawText(70, 50, tempValue + "°C")
+    tempValue = map(tempValue, 0, 50, 0, 180) # map 0-50°C to 0-180degrees
+    drawFingerLine (tempValue, 95, 1)
+    
+    # Pressure output
+    white.stroke() # lines color
+    drawText(85, 165, presValue)
+    textFont(FONT_ROBOTO_16)
+    drawText(60, 150, "hPa in " + height + "m ü NN")
+    presValue = map(presValue, 950, 1050, 0, 180) # map 940-1060hPa to 0-180degrees
+    drawFingerLine (180 + presValue, 95, 2)
+
+    red.fill() 
+    noStroke()
+    drawCircle(120,120,10)  # little Middle circle 
+    darkgray.fill() 
+    noStroke()
+    drawCircle(120,120,8)  # little Middle circle 
+
+
+
+    if getButton():
+        if returnToMenu():
+            return
+    update()
+    tempValue = 0
+    presValue = 0
